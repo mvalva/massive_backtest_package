@@ -1,0 +1,19 @@
+# ============================================================
+# CONFIGURAZIONE API - Massive e SEC
+# ============================================================
+# Copia questo contenuto nel file .env (nella ROOT del progetto,
+# cioè in massive_backtest_package/.env) e sostituisci le chiavi.
+#
+# Oppure crea/modifica massive_backtest/.env con le stesse variabili.
+# ============================================================
+
+# API Massive.com (ex Polygon.io) - prezzi OHLC, dati ticker
+# Ottieni la chiave su https://massive.com o https://polygon.io
+MASSIVE_API_KEY=la_tua_chiave_massive
+
+# API SEC (sec-api.io) - Form 4, insider trading (acquisti codice P)
+# Ottieni la chiave su https://sec-api.io
+SEC_API_KEY=la_tua_chiave_sec
+
+# Opzionale: analisi AI
+# OPENAI_API_KEY=la_tua_chiave_openai

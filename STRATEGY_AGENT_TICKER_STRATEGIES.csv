@@ -1,0 +1,161 @@
+﻿ticker;strategia
+STGW;CEO + Director (combo)
+STGW;Small cap (≤1B) CEO/CFO
+ENPH;CEO only
+SPHR;CEO only
+STGW;CEO only
+SPHR;CEO only + Value ≥500k
+SPHR;CEO only + Position +10%
+SPHR;Near 52w high + CEO/CFO
+AMN;CEO/CFO
+ENPH;CEO/CFO
+SPHR;CEO/CFO
+STGW;CEO/CFO
+AMN;Officer/President
+ENPH;Officer/President
+SPHR;Officer/President
+STGW;Officer/President
+AMN;Large cap (≥250M) CEO/CFO
+ENPH;Large cap (≥250M) CEO/CFO
+SPHR;Large cap (≥250M) CEO/CFO
+STGW;Large cap (≥250M) CEO/CFO
+AMN;Large cap (≥500M) CEO/CFO
+ENPH;Large cap (≥500M) CEO/CFO
+SPHR;Large cap (≥500M) CEO/CFO
+STGW;Large cap (≥500M) CEO/CFO
+ENPH;CEO only + Value ≥100k
+SPHR;CEO only + Value ≥100k
+ENPH;Price > MA50 + CEO/CFO
+SPHR;Price > MA50 + CEO/CFO
+AMN;Mid cap (1B–10B) CEO/CFO
+SPHR;Mid cap (1B–10B) CEO/CFO
+AMN;Multiple buys (n≥2)
+OVLY;Multiple buys (n≥2)
+STGW;Multiple buys (n≥2)
+AMN;Qty ≥5k shares
+NHI;Qty ≥5k shares
+NOVA;Qty ≥5k shares
+SPHR;Qty ≥5k shares
+STGW;Qty ≥5k shares
+WU;Qty ≥5k shares
+AMN;Qty ≥10k shares
+NHI;Qty ≥10k shares
+NOVA;Qty ≥10k shares
+SPHR;Qty ≥10k shares
+STGW;Qty ≥10k shares
+WU;Qty ≥10k shares
+AMN;CEO/CFO + Value ≥100k
+ENPH;CEO/CFO + Value ≥100k
+SPHR;CEO/CFO + Value ≥100k
+AMN;Large cap (≥750M) CEO/CFO
+ENPH;Large cap (≥750M) CEO/CFO
+SPHR;Large cap (≥750M) CEO/CFO
+AMN;Large cap (≥1B) CEO/CFO
+ENPH;Large cap (≥1B) CEO/CFO
+SPHR;Large cap (≥1B) CEO/CFO
+NOVA;Qty ≥50k shares
+SPHR;Qty ≥50k shares
+NOVA;Value ≥1M
+SPHR;Value ≥1M
+AMN;CFO only
+AMN;CFO + Director (combo)
+AMN;CFO only + Value ≥50k
+AMN;CFO only + Value ≥100k
+AMN;CFO only + Position +10%
+AMN;CFO only + Position +20%
+AMN;RSI oversold (<30)
+AMN;RSI oversold + CEO/CFO
+AMN;RSI oversold + Value ≥100k
+ENPH;Large cap (≥3B) CEO/CFO
+ENPH;Large cap (≥5B) CEO/CFO
+ENPH;Large cap (≥10B) CEO/CFO
+AMN;Value ≥500k
+NHI;Value ≥500k
+NOVA;Value ≥500k
+SPHR;Value ≥500k
+AMN;Price < MA50
+AWR;Price < MA50
+NOVA;Price < MA50
+OVLY;Price < MA50
+STGW;Price < MA50
+ENPH;Price > MA50
+MDV;Price > MA50
+NHI;Price > MA50
+SPHR;Price > MA50
+WU;Price > MA50
+MDV;Price > MA200
+NHI;Price > MA200
+SPHR;Price > MA200
+WU;Price > MA200
+AMN;Value ≥50k
+AWR;Value ≥50k
+ENPH;Value ≥50k
+NHI;Value ≥50k
+NOVA;Value ≥50k
+OVLY;Value ≥50k
+SPHR;Value ≥50k
+STGW;Value ≥50k
+WU;Value ≥50k
+AMN;Tutti
+AWR;Tutti
+ENPH;Tutti
+MDV;Tutti
+NHI;Tutti
+NOVA;Tutti
+OVLY;Tutti
+SPHR;Tutti
+STGW;Tutti
+WU;Tutti
+AMN;Large cap (≥2B) CEO/CFO
+ENPH;Large cap (≥2B) CEO/CFO
+AMN;Mid cap (1B–10B) Value ≥100k
+NHI;Mid cap (1B–10B) Value ≥100k
+SPHR;Mid cap (1B–10B) Value ≥100k
+WU;Mid cap (1B–10B) Value ≥100k
+AMN;Value ≥100k
+ENPH;Value ≥100k
+NHI;Value ≥100k
+NOVA;Value ≥100k
+SPHR;Value ≥100k
+WU;Value ≥100k
+AMN;Director
+AWR;Director
+MDV;Director
+NHI;Director
+NOVA;Director
+OVLY;Director
+STGW;Director
+WU;Director
+AMN;Far 52w high + Value ≥100k
+ENPH;Far 52w high + Value ≥100k
+NOVA;Far 52w high + Value ≥100k
+AMN;Position +30%
+AWR;Position +30%
+NOVA;Position +30%
+NHI;RSI overbought (>70)
+WU;RSI overbought (>70)
+AMN;Position +10%
+AWR;Position +10%
+NOVA;Position +10%
+OVLY;Position +10%
+SPHR;Position +10%
+WU;Position +10%
+NHI;Director only + Value ≥100k
+NOVA;Director only + Value ≥100k
+WU;Director only + Value ≥100k
+NOVA;Qty ≥100k shares
+NOVA;Small cap (≤1B) Value ≥100k
+AMN;Position +20%
+AWR;Position +20%
+NOVA;Position +20%
+WU;Position +20%
+AWR;Director only (no C-level)
+MDV;Director only (no C-level)
+NHI;Director only (no C-level)
+NOVA;Director only (no C-level)
+OVLY;Director only (no C-level)
+WU;Director only (no C-level)
+AWR;Director only + Position +10%
+NOVA;Director only + Position +10%
+OVLY;Director only + Position +10%
+WU;Director only + Position +10%

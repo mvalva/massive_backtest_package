@@ -1,0 +1,43 @@
+======================================================================
+  AGENTE STRATEGIE — Report di auto-miglioramento
+======================================================================
+
+--- ANALISI TOP STRATEGIE ---
+
+Hold key più presenti nelle top 50:
+  ret_high_90d_news: 10 volte
+  ret_high_90d_open: 7 volte
+  ret_high_60d_news: 6 volte
+  ret_high_60d_open: 3 volte
+  ret_high_7d_news: 3 volte
+  ret_high_10d_news: 3 volte
+  ret_high_14d_news: 3 volte
+  ret_high_30d_news: 3 volte
+  ret_high_5d_news: 3 volte
+  ret_high_7d_open: 3 volte
+
+Temi ricorrenti (keyword nei nomi):
+  CEO: 48 volte
+  CFO: 20 volte
+  Value ≥500k: 10 volte
+  Position +10%: 10 volte
+  Near 52w: 10 volte
+  Director: 4 volte
+  combo: 4 volte
+  Small cap: 4 volte
+
+--- SUGGERIMENTI PER NUOVE STRATEGIE ---
+
+1. Confronta anche ret_low_30d (worst case) per le stesse strategie
+   Motivo: Diversificare metriche (best vs worst case).
+   Descrizione: Le top strategie usano ret_high (best case). Valuta ret_low per rischio.
+
+2. RSI oversold + CEO only / CFO only (già presenti) + altre combo RSI + ruolo
+   Motivo: Top strategie sono ruolo-based; TA non presente nelle top → prova combinazioni.
+   Descrizione: Aggiungi filtri TA (RSI, MA) alle strategie ruolo per vedere se migliorano.
+
+3. Variante TA: 'CEO + Director (combo)' + RSI oversold
+   Motivo: Aggiungere analisi tecnica a strategie già performanti.
+   Descrizione: La strategia 'CEO + Director (combo)' è in top; prova ad aggiungere filtro RSI < 30.
+
+======================================================================

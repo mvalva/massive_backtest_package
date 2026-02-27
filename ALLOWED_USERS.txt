@@ -1,0 +1,3 @@
+# Email autorizzate ad accedere all'Explorer strategie (uno per riga)
+m.valvason@gmail.com
+

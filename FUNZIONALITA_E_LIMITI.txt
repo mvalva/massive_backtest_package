@@ -1,0 +1,44 @@
+================================================================================
+  MASSIVE BACKTEST — App (localhost:8501)
+  Funzionalità e limiti
+================================================================================
+
+COSA FA L'APP
+-------------
+- Carica acquisti insider SEC (Form 4, codice P = open market purchase).
+- Esclude le company con "fund", "ETF", "trust", "REIT" nel nome.
+- Raggruppa per cluster (ticker + data filing).
+- Esegue il backtest con i prezzi Massive.com: prezzo di entry, rendimenti a 4h, 24h, 48h, 5d, 7d, 10d, 14d, 30d, max drawdown e max run-up.
+- Mostra la tabella cluster e i "Dati di lettura base" (riepilogo dataset, statistiche per orizzonte, win rate per ruolo).
+
+STRUTTURA E AVVIO
+-----------------
+- Estrai lo zip mantenendo la struttura: una cartella che contenga "massive_backtest" e "sec_tools" (solo sec_latest_buys.py).
+- Installa le dipendenze: pip install -r massive_backtest/requirements.txt
+- In massive_backtest/.env inserisci le tue chiavi (ora sono vuote):
+  - MASSIVE_API_KEY = chiave Massive.com (ex Polygon) per i prezzi
+  - SEC_API_KEY = chiave sec-api.io per i filing SEC
+- Dalla cartella che contiene massive_backtest e sec_tools esegui:
+  streamlit run massive_backtest/app.py
+  Oppure: python -m streamlit run massive_backtest/app.py --server.port 8501
+- Apri il browser su http://localhost:8501
+
+FUNZIONALITÀ DELL'APP
+---------------------
+- Scelta del lasso temporale (10 gg, 30 gg, 6 mesi, 1 anno, 2 anni) e pulsante per caricare SEC e calcolare il backtest Massive.
+- Tabella dei cluster con tutti i campi e pulsante per scaricare il CSV.
+- Sezione "Dati di lettura base": riepilogo del dataset (righe, value mediana, mcap, % titoli, ruoli), statistiche per orizzonte (win %, n, avg %, mediana, std, min, max), win rate per ruolo (ret_7d).
+- Spiegazione (in expander) del perché alcune voci visibili su Open Insider possono mancare (fondi esclusi, limite risultati SEC, backtest fallito per assenza prezzi, fonte diversa).
+
+LIMITI ATTUALI
+--------------
+- ret_4h: se Massive non fornisce barre intraday (es. titoli small cap), viene usata la chiusura dello stesso giorno come approssimazione.
+- Alcune voci Open Insider possono mancare: (1) company con "fund"/ETF/trust/REIT nel nome vengono escluse; (2) il numero massimo di risultati SEC può tagliare gli ultimi filing; (3) cluster senza prezzi Massive finiscono in "Dettaglio errori" e non in tabella.
+- I dati sono solo insider Form 4 codice P; nessun altro segnale.
+
+FILE .env
+---------
+- In massive_backtest/.env sono presenti solo MASSIVE_API_KEY e SEC_API_KEY (vuote). Inserisci le tue chiavi senza spazi intorno al =.
+- In alternativa puoi usare env_template.txt come riferimento.
+
+================================================================================
