@@ -245,12 +245,121 @@ def _render_strategy_agent_tab() -> None:
             f"{len(ranking_records)} righe in {ranking_path.name}."
         )
 
-        st.markdown("#### Anteprima strategie (prime 20 per Score_strategy)")
-        if "Score_strategy" in ranking_df.columns:
-            ranking_df = ranking_df.sort_values("Score_strategy", ascending=False)
-        st.dataframe(ranking_df.head(20), use_container_width=True, hide_index=True)
-        st.markdown("#### Tutte le strategie (ranking completo)")
-        st.dataframe(ranking_df, use_container_width=True, height=400, hide_index=True)
+        # Costruisci struttura cluster_year per filtri per anno, riusata come in Explorer
+        cases_df = df_results.copy()
+        if "filing_day" in cases_df.columns:
+            cases_df["filing_day"] = pd.to_datetime(cases_df["filing_day"], errors="coerce")
+            cases_df["year"] = cases_df["filing_day"].dt.year
+        else:
+            cases_df["year"] = None
+        if "cluster_key" not in cases_df.columns:
+            def _mk_cluster_key_agent(row) -> str:
+                t = str(row.get("ticker", "")).strip().upper()
+                d = str(row.get("filing_day", "") or row.get("filedAt", "")).strip()[:10]
+                return f"{t}|{d}" if t and d else ""
+            cases_df["cluster_key"] = cases_df.apply(_mk_cluster_key_agent, axis=1)
+        cluster_year = dict(zip(cases_df["cluster_key"], cases_df["year"]))
+
+        # Filtri strategie (gli stessi dell'Explorer)
+        with st.expander("Filtri strategie", expanded=True):
+            dataset_choice = st.radio(
+                "Dataset strategie",
+                ["Tutte le strategie", "Solo SEC (no analisi tecnica)"],
+                horizontal=True,
+                key="agent_dataset_choice",
+            )
+            order_choice = st.radio(
+                "Ordina per",
+                ["Score (Base_name)", "Score_strategy (Strategia esatta)"],
+                horizontal=True,
+                key="agent_order_choice",
+            )
+            cols_top = st.columns(4)
+            with cols_top[0]:
+                years = sorted([y for y in cases_df["year"].dropna().unique().tolist() if y])
+                if years:
+                    selected_years = st.multiselect("Anni filing", options=years, default=years, key="agent_years")
+                else:
+                    selected_years = []
+            with cols_top[1]:
+                ta_profiles = sorted([p for p in ranking_df.get("TA_profile", pd.Series(dtype=str)).dropna().unique().tolist()])
+                if ta_profiles:
+                    selected_ta = st.multiselect("Analisi tecnica (TA_profile)", options=ta_profiles, default=ta_profiles, key="agent_ta")
+                else:
+                    selected_ta = []
+            with cols_top[2]:
+                news_opts = sorted([n for n in ranking_df.get("News_vs_Open", pd.Series(dtype=str)).dropna().unique().tolist()])
+                if news_opts:
+                    selected_news = st.multiselect("Entry (News_vs_Open)", options=news_opts, default=news_opts, key="agent_news")
+                else:
+                    selected_news = []
+            with cols_top[3]:
+                insider_opts = sorted([i for i in ranking_df.get("Insider_type", pd.Series(dtype=str)).dropna().unique().tolist()])
+                if insider_opts:
+                    selected_insider = st.multiselect("Tipo insider", options=insider_opts, default=insider_opts, key="agent_insider")
+                else:
+                    selected_insider = []
+
+            cols_bottom = st.columns(2)
+            with cols_bottom[0]:
+                base_names = sorted([b for b in ranking_df.get("Base_name", pd.Series(dtype=str)).dropna().unique().tolist()])
+                selected_bases = st.multiselect("Macrocategorie (Base_name)", options=base_names, default=base_names, key="agent_bases")
+            with cols_bottom[1]:
+                metric_kinds = sorted([m for m in ranking_df.get("Metric_kind", pd.Series(dtype=str)).dropna().unique().tolist()])
+                selected_metric = st.multiselect("Metrica (high/low/mean)", options=metric_kinds, default=metric_kinds, key="agent_metric")
+
+        rank_filtered = ranking_df.copy()
+
+        # SEC only vs tutte
+        if dataset_choice.startswith("Solo") and "TA_profile" in rank_filtered.columns:
+            rank_filtered = rank_filtered[rank_filtered["TA_profile"] == "SEC only"]
+
+        # Filtro per anno: mantieni solo strategie con almeno un cluster nell'anno selezionato
+        if selected_years:
+            valid_clusters = {ck for ck, y in cluster_year.items() if y in selected_years}
+
+            def _has_cluster_in_year_agent(clusters_str: str) -> bool:
+                if not clusters_str:
+                    return False
+                for ck in str(clusters_str).split(","):
+                    if ck.strip() in valid_clusters:
+                        return True
+                return False
+
+            if "Clusters_used_N" in rank_filtered.columns:
+                rank_filtered = rank_filtered[rank_filtered["Clusters_used_N"].apply(_has_cluster_in_year_agent)]
+
+        if selected_ta and "TA_profile" in rank_filtered.columns:
+            rank_filtered = rank_filtered[rank_filtered["TA_profile"].isin(selected_ta)]
+        if selected_news and "News_vs_Open" in rank_filtered.columns:
+            rank_filtered = rank_filtered[rank_filtered["News_vs_Open"].isin(selected_news)]
+        if selected_insider and "Insider_type" in rank_filtered.columns:
+            rank_filtered = rank_filtered[rank_filtered["Insider_type"].isin(selected_insider)]
+        if selected_bases and "Base_name" in rank_filtered.columns:
+            rank_filtered = rank_filtered[rank_filtered["Base_name"].isin(selected_bases)]
+        if selected_metric and "Metric_kind" in rank_filtered.columns:
+            rank_filtered = rank_filtered[rank_filtered["Metric_kind"].isin(selected_metric)]
+
+        # Ordinamento per Score base_name o Score_strategy
+        if order_choice.startswith("Score_strategy") and "Score_strategy" in rank_filtered.columns:
+            rank_filtered = rank_filtered.sort_values("Score_strategy", ascending=False)
+        elif "Score" in rank_filtered.columns:
+            rank_filtered = rank_filtered.sort_values("Score", ascending=False)
+
+        if rank_filtered.empty:
+            st.warning("Nessuna strategia soddisfa i filtri selezionati.")
+            return
+
+        st.markdown("#### Anteprima strategie (prime 20 dopo filtri)")
+        display_cols = [
+            "Ranking", "Score", "Ranking_strategy", "Score_strategy",
+            "Strategia", "Base_name", "TA_profile", "News_vs_Open", "Insider_type",
+            "Metric_kind", "Horizon_days", "Entry_kind", "N", "Win_rate_%", "Avg_ret_%", "Median_ret_%", "Total_ret_%",
+        ]
+        display_cols = [c for c in display_cols if c in rank_filtered.columns]
+        st.dataframe(rank_filtered.head(20)[display_cols], use_container_width=True, hide_index=True)
+        st.markdown("#### Tutte le strategie (ranking completo dopo filtri)")
+        st.dataframe(rank_filtered[display_cols], use_container_width=True, height=400, hide_index=True)
 
         report_txt = build_report(df_results, ranking_records, errors_list, out_path=None)
         st.download_button(
@@ -384,6 +493,18 @@ def _render_strategy_explorer_tab() -> None:
     cluster_year = dict(zip(cases_df["cluster_key"], cases_df["year"]))
 
     with st.expander("Filtri globali", expanded=True):
+        dataset_choice = st.radio(
+            "Dataset strategie",
+            ["Tutte le strategie", "Solo SEC (no analisi tecnica)"],
+            horizontal=True,
+            key="explorer_dataset_choice",
+        )
+        order_choice = st.radio(
+            "Ordina per",
+            ["Score (Base_name)", "Score_strategy (Strategia esatta)"],
+            horizontal=True,
+            key="explorer_order_choice",
+        )
         cols_top = st.columns(4)
         # Filtro per anno filing (multi-select)
         with cols_top[0]:
@@ -425,6 +546,10 @@ def _render_strategy_explorer_tab() -> None:
     # Applica filtri al ranking
     rank_filtered = ranking_df.copy()
 
+    # SEC only vs tutte
+    if dataset_choice.startswith("Solo") and "TA_profile" in rank_filtered.columns:
+        rank_filtered = rank_filtered[rank_filtered["TA_profile"] == "SEC only"]
+
     # Filtro per anno: mantieni solo strategie con almeno un cluster nell'anno selezionato
     if selected_years:
         valid_clusters = {ck for ck, y in cluster_year.items() if y in selected_years}
@@ -450,6 +575,12 @@ def _render_strategy_explorer_tab() -> None:
         rank_filtered = rank_filtered[rank_filtered["Base_name"].isin(selected_bases)]
     if selected_metric and "Metric_kind" in rank_filtered.columns:
         rank_filtered = rank_filtered[rank_filtered["Metric_kind"].isin(selected_metric)]
+
+    # Ordinamento per Score / Score_strategy
+    if order_choice.startswith("Score_strategy") and "Score_strategy" in rank_filtered.columns:
+        rank_filtered = rank_filtered.sort_values("Score_strategy", ascending=False)
+    elif "Score" in rank_filtered.columns:
+        rank_filtered = rank_filtered.sort_values("Score", ascending=False)
 
     if rank_filtered.empty:
         st.warning("Nessuna strategia soddisfa i filtri selezionati.")
