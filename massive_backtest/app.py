@@ -186,57 +186,77 @@ def main():
 
 
 def _render_strategy_agent_tab() -> None:
-    st.subheader("Agente strategie SEC — Backtest 3 anni Massive")
+    st.subheader("Agente strategie SEC — risultati da output esistenti")
     st.caption(
-        "Carica 3 anni di acquisti SEC (Form 4, P), esegue il backtest su Massive per ogni cluster, "
-        "valuta decine di strategie (filtri per ruolo/valore + orizzonte hold) e restituisce le migliori."
+        "Questa vista NON lancia una nuova run né chiama le API. "
+        "Usa i file già generati (CASES/RANKING/ERRORS) come database: ideale per l'app online."
     )
-    if not os.getenv("MASSIVE_API_KEY") or not os.getenv("SEC_API_KEY"):
-        st.error("Imposta MASSIVE_API_KEY e SEC_API_KEY nel file .env per usare l'agente.")
-        return
     try:
         from massive_backtest.strategy_agent import (
-            run_agent, build_report, build_cases_report, build_tickers_report, build_10k_strategy,
+            build_report, build_cases_report, build_tickers_report, build_10k_strategy,
             STRATEGY_10K_BUDGET, STRATEGY_10K_LOOKBACK_DAYS, STRATEGY_10K_MAX_POSITIONS,
         )
     except ImportError:
         from strategy_agent import (
-            run_agent, build_report, build_cases_report, build_tickers_report, build_10k_strategy,
+            build_report, build_cases_report, build_tickers_report, build_10k_strategy,
             STRATEGY_10K_BUDGET, STRATEGY_10K_LOOKBACK_DAYS, STRATEGY_10K_MAX_POSITIONS,
         )
-    col_days, col_max = st.columns(2)
-    with col_days:
-        days_sec = st.number_input("Giorni SEC (es. 1095 = 3 anni)", min_value=30, max_value=1095, value=1095, step=30)
-    with col_max:
-        max_results_sec = st.number_input("Max risultati SEC API", min_value=500, max_value=20000, value=15000, step=500)
-    if st.button("Esegui agente (backtest 3 anni + ranking strategie)", type="primary", key="run_agent_btn"):
-        errors = []
-        progress_placeholder = st.empty()
-        with st.status("Esecuzione agente...", expanded=True) as status:
-            def progress(msg: str, pct: float):
-                progress_placeholder.caption(f"[{pct:.0f}%] {msg}")
+    base = st.text_input("Prefisso base dei file output", value="STRATEGY_AGENT", key="agent_base_prefix")
+    if not base:
+        return
+
+    out_dir = ROOT
+    cases_path = out_dir / f"{base}_CASES.csv"
+    ranking_path = out_dir / f"{base}_RANKING.csv"
+    errors_path = out_dir / f"{base}_ERRORS.csv"
+
+    if not cases_path.exists() or not ranking_path.exists():
+        st.error(
+            f"Non trovo i file necessari nella root del progetto per il prefisso '{base}'.\n\n"
+            f"Richiesti: {base}_CASES.csv e {base}_RANKING.csv (opzionale: {base}_ERRORS.csv).\n"
+            "Esegui una run dell'agente da riga di comando, poi ricarica questa pagina."
+        )
+        return
+
+    if st.button("Carica risultati da CSV esistenti", type="primary", key="load_agent_outputs_btn"):
+        try:
+            df_results = pd.read_csv(cases_path, sep=";", encoding="utf-8-sig", low_memory=False)
+        except Exception as e:
+            st.error(f"Errore lettura {cases_path.name}: {type(e).__name__}: {e}")
+            return
+        try:
+            ranking_df = pd.read_csv(ranking_path, sep=";", encoding="utf-8-sig", low_memory=False)
+        except Exception as e:
+            st.error(f"Errore lettura {ranking_path.name}: {type(e).__name__}: {e}")
+            return
+
+        errors_list: list[dict] = []
+        if errors_path.exists():
             try:
-                df_results, err_list, ranking, _ = run_agent(
-                    days_sec=int(days_sec),
-                    max_results_sec=int(max_results_sec),
-                    progress_callback=progress,
-                    errors_list=errors,
-                )
-            except Exception as e:
-                status.update(label="Errore", state="error")
-                st.error(str(e))
-                return
-            status.update(label="Completato", state="complete", expanded=False)
-        st.success(f"Backtest completato: {len(df_results)} cluster, {len(ranking)} strategie valutate.")
-        if err_list:
-            st.warning(f"Cluster saltati/errori: {len(err_list)}")
-        ranking_df = pd.DataFrame(ranking)
-        st.markdown("#### Anteprima strategie (prime 20 per rendimento medio %)")
+                err_df = pd.read_csv(errors_path, sep=";", encoding="utf-8-sig", low_memory=False)
+                errors_list = err_df.to_dict("records") if not err_df.empty else []
+            except Exception:
+                errors_list = []
+
+        ranking_records = ranking_df.to_dict("records")
+
+        st.success(
+            f"Risultati caricati da file: {len(df_results)} cluster in {cases_path.name}, "
+            f"{len(ranking_records)} righe in {ranking_path.name}."
+        )
+
+        st.markdown("#### Anteprima strategie (prime 20 per Score_strategy)")
+        if "Score_strategy" in ranking_df.columns:
+            ranking_df = ranking_df.sort_values("Score_strategy", ascending=False)
         st.dataframe(ranking_df.head(20), use_container_width=True, hide_index=True)
         st.markdown("#### Tutte le strategie (ranking completo)")
         st.dataframe(ranking_df, use_container_width=True, height=400, hide_index=True)
-        report_txt = build_report(df_results, ranking, err_list, out_path=None)
-        st.download_button("Scarica report completo", data=report_txt, file_name="STRATEGY_AGENT_REPORT.txt", mime="text/plain", key="dl_agent_report")
+
+        report_txt = build_report(df_results, ranking_records, errors_list, out_path=None)
+        st.download_button(
+            "Scarica report completo", data=report_txt,
+            file_name=f"{base}_REPORT.txt", mime="text/plain", key="dl_agent_report"
+        )
 
         st.markdown("---")
         st.markdown("#### Analisi caso per caso (azioni)")
@@ -246,32 +266,67 @@ def _render_strategy_agent_tab() -> None:
             st.markdown(cases_report_md)
         col_cases1, col_cases2 = st.columns(2)
         with col_cases1:
-            st.download_button("Scarica report caso per caso (MD)", data=cases_report_md, file_name="STRATEGY_AGENT_CASES_REPORT.md", mime="text/markdown", key="dl_cases_report")
+            st.download_button(
+                "Scarica report caso per caso (MD)",
+                data=cases_report_md,
+                file_name=f"{base}_CASES_REPORT.md",
+                mime="text/markdown",
+                key="dl_cases_report",
+            )
         with col_cases2:
-            st.download_button("Scarica tutti i casi (CSV)", data=df_results.to_csv(index=False, sep=";").encode("utf-8-sig"), file_name="STRATEGY_AGENT_CASES.csv", mime="text/csv", key="dl_cases_csv")
+            st.download_button(
+                "Scarica tutti i casi (CSV)",
+                data=df_results.to_csv(index=False, sep=";").encode("utf-8-sig"),
+                file_name=f"{base}_CASES.csv",
+                mime="text/csv",
+                key="dl_cases_csv",
+            )
 
         st.markdown("---")
         st.markdown("#### Ogni singolo ticker — Performance e uso nell'analisi")
         tickers_report_md = build_tickers_report(df_results, out_path=None, out_path_csv=None)
         with st.expander("Report per ticker (tutti i ticker con n cluster, ret medio, value tot)", expanded=False):
             st.markdown(tickers_report_md)
-        st.download_button("Scarica report ticker (MD)", data=tickers_report_md, file_name="STRATEGY_AGENT_TICKERS.md", mime="text/markdown", key="dl_tickers_md")
+        st.download_button(
+            "Scarica report ticker (MD)",
+            data=tickers_report_md,
+            file_name=f"{base}_TICKERS.md",
+            mime="text/markdown",
+            key="dl_tickers_md",
+        )
 
         st.markdown("---")
         st.markdown("#### Strategia 10k USD — Massimizzare il risultato in un anno")
         strategy_10k_md, positions_10k = build_10k_strategy(
-            df_results, ranking, out_path=None, out_path_csv=None,
-            budget_usd=STRATEGY_10K_BUDGET, lookback_days=STRATEGY_10K_LOOKBACK_DAYS, max_positions=STRATEGY_10K_MAX_POSITIONS,
+            df_results,
+            ranking_records,
+            out_path=None,
+            out_path_csv=None,
+            budget_usd=STRATEGY_10K_BUDGET,
+            lookback_days=STRATEGY_10K_LOOKBACK_DAYS,
+            max_positions=STRATEGY_10K_MAX_POSITIONS,
             top_strategies_k=10,
         )
         with st.expander("Portfolio simulato 10.000 USD (più strategie testate per finestra)", expanded=True):
             st.markdown(strategy_10k_md)
         col_10k1, col_10k2 = st.columns(2)
         with col_10k1:
-            st.download_button("Scarica strategia 10k (MD)", data=strategy_10k_md, file_name="STRATEGY_AGENT_10K.md", mime="text/markdown", key="dl_10k_md")
+            st.download_button(
+                "Scarica strategia 10k (MD)",
+                data=strategy_10k_md,
+                file_name=f"{base}_10K.md",
+                mime="text/markdown",
+                key="dl_10k_md",
+            )
         with col_10k2:
             if positions_10k:
-                st.download_button("Scarica posizioni 10k (CSV)", data=pd.DataFrame(positions_10k).to_csv(index=False, sep=";").encode("utf-8-sig"), file_name="STRATEGY_AGENT_10K.csv", mime="text/csv", key="dl_10k_csv")
+                st.download_button(
+                    "Scarica posizioni 10k (CSV)",
+                    data=pd.DataFrame(positions_10k).to_csv(index=False, sep=";").encode("utf-8-sig"),
+                    file_name=f"{base}_10K.csv",
+                    mime="text/csv",
+                    key="dl_10k_csv",
+                )
 
 
 def _render_strategy_explorer_tab() -> None:
