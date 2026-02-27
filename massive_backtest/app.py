@@ -50,6 +50,43 @@ LOSS_THRESHOLDS = [-0.5, -1, -1.5, -2, -2.5, -3, -3.5, -4, -4.5, -5, -5.5, -6, -
 WINDOWS = ["24h", "48h", "5d", "7d", "14d", "30d", "60d"]
 
 
+def _ensure_strategy_scores(rank_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Garantisce la presenza delle colonne Score_strategy e Ranking_strategy nel ranking,
+    ricalcolandole se mancanti a partire da Avg_ret_% e Win_rate_% medi per Strategia.
+    """
+    if rank_df.empty:
+        return rank_df
+    if "Score_strategy" in rank_df.columns and "Ranking_strategy" in rank_df.columns:
+        return rank_df
+    if "Strategia" not in rank_df.columns or "Avg_ret_%" not in rank_df.columns or "Win_rate_%" not in rank_df.columns:
+        return rank_df
+    agg = rank_df.groupby("Strategia", dropna=False).agg(
+        mean_avg_ret=("Avg_ret_%", "mean"),
+        mean_win_rate=("Win_rate_%", "mean"),
+    ).reset_index()
+    if agg.empty:
+        return rank_df
+    r_min, r_max = agg["mean_avg_ret"].min(), agg["mean_avg_ret"].max()
+    w_min, w_max = agg["mean_win_rate"].min(), agg["mean_win_rate"].max()
+    if (r_max - r_min) != 0:
+        norm_ret = (agg["mean_avg_ret"] - r_min) / (r_max - r_min)
+    else:
+        norm_ret = 0.5
+    if (w_max - w_min) != 0:
+        norm_win = (agg["mean_win_rate"] - w_min) / (w_max - w_min)
+    else:
+        norm_win = 0.5
+    agg["_score"] = 0.5 * norm_ret + 0.5 * norm_win
+    agg = agg.sort_values("_score", ascending=False)
+    strat_to_rank = {s: i for i, s in enumerate(agg["Strategia"], 1)}
+    strat_to_score = dict(zip(agg["Strategia"], (agg["_score"] * 100).round(2)))
+    out = rank_df.copy()
+    out["Ranking_strategy"] = out["Strategia"].map(strat_to_rank)
+    out["Score_strategy"] = out["Strategia"].map(strat_to_score)
+    return out
+
+
 def _load_allowed_users() -> set[str]:
     """
     Carica la lista di email autorizzate ad accedere all'explorer strategie.
@@ -230,6 +267,7 @@ def _render_strategy_agent_tab() -> None:
             st.error(f"Errore lettura {ranking_path.name}: {type(e).__name__}: {e}")
             return
 
+        ranking_df = _ensure_strategy_scores(ranking_df)
         errors_list: list[dict] = []
         if errors_path.exists():
             try:
@@ -474,6 +512,7 @@ def _render_strategy_explorer_tab() -> None:
         st.error(f"Errore lettura CSV: {type(e).__name__}: {e}")
         return
 
+    ranking_df = _ensure_strategy_scores(ranking_df)
     # Parsing date e anno filing
     if "filing_day" in cases_df.columns:
         cases_df["filing_day"] = pd.to_datetime(cases_df["filing_day"], errors="coerce")
@@ -787,7 +826,88 @@ def _render_backtest_tab() -> None:
         st.info("Seleziona la sorgente CSV e premi «Carica dati da CSV esistente» per vedere i dati base.")
         return
 
-    df = st.session_state["mb_df"]
+    df = st.session_state["mb_df"].copy()
+
+    # Filtri sui cluster caricati
+    with st.expander("Filtri cluster", expanded=True):
+        years = None
+        if "filing_day" in df.columns:
+            df["filing_day"] = pd.to_datetime(df["filing_day"], errors="coerce")
+            df["year"] = df["filing_day"].dt.year
+            years = sorted([y for y in df["year"].dropna().unique().tolist() if y])
+        else:
+            df["year"] = None
+        cols_top = st.columns(4)
+        with cols_top[0]:
+            if years:
+                selected_years = st.multiselect("Anni filing", options=years, default=years, key="backtest_years")
+            else:
+                selected_years = []
+        with cols_top[1]:
+            roles_opts = []
+            if "titles" in df.columns:
+                base_titles = ["CEO", "CFO", "Director", "Officer", "10% Owner"]
+                roles_opts = [t for t in base_titles if df["titles"].fillna("").str.contains(t, case=False, na=False).any()]
+            elif "role" in df.columns:
+                roles_opts = sorted(df["role"].dropna().unique().tolist())
+            selected_roles = st.multiselect("Ruoli insider", options=roles_opts, default=roles_opts, key="backtest_roles")
+        with cols_top[2]:
+            min_val, max_val = None, None
+            if "value_tot" in df.columns:
+                vals = pd.to_numeric(df["value_tot"], errors="coerce").dropna()
+                if not vals.empty:
+                    min_val = float(vals.min())
+                    max_val = float(vals.max())
+            if min_val is not None and max_val is not None and min_val < max_val:
+                v_min, v_max = st.slider(
+                    "Range value_tot (USD)",
+                    min_value=float(min_val),
+                    max_value=float(max_val),
+                    value=(float(min_val), float(max_val)),
+                    key="backtest_value_range",
+                )
+            else:
+                v_min, v_max = None, None
+        with cols_top[3]:
+            min_mc, max_mc = None, None
+            if "market_cap" in df.columns:
+                mcs = pd.to_numeric(df["market_cap"], errors="coerce").dropna()
+                if not mcs.empty:
+                    min_mc = float(mcs.min())
+                    max_mc = float(mcs.max())
+            if min_mc is not None and max_mc is not None and min_mc < max_mc:
+                mc_min, mc_max = st.slider(
+                    "Range market_cap (USD)",
+                    min_value=float(min_mc),
+                    max_value=float(max_mc),
+                    value=(float(min_mc), float(max_mc)),
+                    key="backtest_mcap_range",
+                )
+            else:
+                mc_min, mc_max = None, None
+
+        ticker_filter = st.text_input("Filtro ticker (contiene…)", key="backtest_ticker_filter").strip().upper()
+
+    # Applica filtri
+    if "year" in df.columns and selected_years:
+        df = df[df["year"].isin(selected_years)]
+    if selected_roles:
+        if "titles" in df.columns:
+            mask = False
+            titles_series = df["titles"].fillna("")
+            for r in selected_roles:
+                mask = mask | titles_series.str.contains(r, case=False, na=False)
+            df = df[mask]
+        elif "role" in df.columns:
+            df = df[df["role"].isin(selected_roles)]
+    if v_min is not None and v_max is not None and "value_tot" in df.columns:
+        vals = pd.to_numeric(df["value_tot"], errors="coerce")
+        df = df[(vals >= v_min) & (vals <= v_max)]
+    if mc_min is not None and mc_max is not None and "market_cap" in df.columns:
+        mcs = pd.to_numeric(df["market_cap"], errors="coerce")
+        df = df[(mcs >= mc_min) & (mcs <= mc_max)]
+    if ticker_filter and "ticker" in df.columns:
+        df = df[df["ticker"].fillna("").str.upper().str.contains(ticker_filter)]
     ret_order = ["ret_4h", "ret_24h", "ret_48h", "ret_5d", "ret_7d", "ret_10d", "ret_14d", "ret_30d"]
     ret_cols_present = [c for c in ret_order if c in df.columns]
     if ret_cols_present:
