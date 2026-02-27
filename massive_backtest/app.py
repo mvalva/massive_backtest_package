@@ -604,7 +604,7 @@ def _render_csv_analysis_tab() -> None:
 
 def _render_backtest_tab() -> None:
     st.markdown("---")
-    st.subheader("Caricamento dati")
+    st.subheader("Caricamento dati da CSV esistenti (nessun backtest live)")
     with st.expander("Criteri sui dati SEC", expanded=False):
         st.markdown("""
         - **Codice P** — Solo acquisti open market / private purchase  
@@ -628,66 +628,32 @@ def _render_backtest_tab() -> None:
         4. **Fonte diversa** — Open Insider può usare aggiornamenti o criteri leggermente diversi dalla SEC API che usiamo; l’ordine o il set delle transazioni può non coincidere al 100%.
         """)
 
-    options = [f"{label} ({days} gg)" for label, days, _ in TIME_RANGES]
-    col_period, col_future = st.columns([2, 1])
-    with col_period:
-        sel = st.selectbox("Lasso temporale", options=options, index=0)
-    with col_future:
-        include_future = st.checkbox("Includi entry futura (righe senza prezzi)", value=False)
+    # Sorgenti CSV già generate dalla pipeline (nessuna chiamata API/live)
+    sources = {
+        "ALL_CLUSTERS_DB.csv (database cumulativo)": ROOT / "ALL_CLUSTERS_DB.csv",
+        "STRATEGY_AGENT_CASES.csv (ultima run agente)": ROOT / "STRATEGY_AGENT_CASES.csv",
+    }
+    label = st.selectbox("Sorgente dati cluster", options=list(sources.keys()))
+    csv_path = sources[label]
 
-    idx = options.index(sel)
-    _, days, max_results = TIME_RANGES[idx]
+    if not csv_path.exists():
+        st.error(
+            f"Non trovo il file {csv_path.name} nella root del progetto.\n\n"
+            "Generalo con una run locale (run_strategy_agent.py) e ricarica la pagina, "
+            "oppure carica manualmente il CSV nella stessa cartella del progetto."
+        )
+        return
 
-    if st.button("Carica SEC e calcola backtest (Massive)", type="primary"):
-        backtest_errors: list[dict] = []
-
-        with st.status("Caricamento in corso…", expanded=True) as status:
-            st.markdown("**1/3** Dati SEC (Form 4, P)…")
-            rows, sec_error = load_sec_buys(days=days, max_results=max_results, exclude_funds=True)
-            if sec_error:
-                st.error(f"Errore SEC: {sec_error}")
-                status.update(label="Errore", state="error", expanded=True)
-                st.stop()
-            if not rows:
-                st.warning("Nessuna transazione P nel periodo.")
-                status.update(label="Completato", state="complete", expanded=False)
-                st.stop()
-            st.success(f"Caricati {len(rows)} acquisti SEC.")
-
-            st.markdown("**2/3** Cluster (ticker + filing_day)…")
-            rows_for_cluster = get_rows_for_clustering(rows)
-            clusters = group_by_cluster(rows_for_cluster)
-            if not clusters:
-                st.warning("Nessun cluster.")
-                status.update(label="Completato", state="complete", expanded=False)
-                st.stop()
-            st.success(f"{len(clusters)} cluster.")
-
-            st.markdown("**3/3** Backtest Massive (prezzi, rendimenti, max dd/runup)…")
-            progress_bar = st.progress(0.0, text="0 / 0")
-            last_msg = st.empty()
-
-            def on_progress(current: int, total: int, ticker: str, error: str | None) -> None:
-                p = current / total if total else 0.0
-                progress_bar.progress(p, text=f"{current} / {total} — {ticker}" + (f" — ⚠ {error}" if error else ""))
-
-            results = run_backtest(clusters, progress_callback=on_progress, errors_list=backtest_errors, exclude_future_entry=not include_future)
-            progress_bar.progress(1.0, text=f"Fatto: {len(clusters)} cluster.")
-            n_ok = len(results)
-            n_skip = len(clusters) - n_ok
-            last_msg.markdown(f"Completato. **{n_ok}** cluster con dati." + (f" Esclusi (entry futura / no prezzi): **{n_skip}**." if n_skip and not include_future else ""))
-            status.update(label="Completato", state="complete", expanded=False)
-
-        if backtest_errors:
-            with st.expander("Dettaglio errori / cluster senza dati", expanded=False):
-                err_df = pd.DataFrame(backtest_errors)
-                st.dataframe(err_df, use_container_width=True, height=min(250, 80 + 35 * len(backtest_errors)))
-                st.download_button("Scarica errori CSV", data=err_df.to_csv(index=False), file_name="massive_backtest_errors.csv", mime="text/csv", key="dl_errors")
-
-        st.session_state["mb_df"] = pd.DataFrame(results)
+    if st.button("Carica dati da CSV esistente", type="primary", key="load_backtest_csv_btn"):
+        try:
+            df_loaded = pd.read_csv(csv_path, sep=";", encoding="utf-8-sig", low_memory=False)
+        except Exception as e:
+            st.error(f"Errore lettura {csv_path.name}: {type(e).__name__}: {e}")
+            return
+        st.session_state["mb_df"] = df_loaded
 
     if "mb_df" not in st.session_state:
-        st.info("Seleziona il lasso temporale e premi «Carica SEC e calcola backtest (Massive)».")
+        st.info("Seleziona la sorgente CSV e premi «Carica dati da CSV esistente» per vedere i dati base.")
         return
 
     df = st.session_state["mb_df"]
